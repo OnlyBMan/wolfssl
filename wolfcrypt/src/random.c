@@ -1644,6 +1644,25 @@ int wc_GenerateSeed(OS_Seed* os, byte* output, word32 sz)
        CUSTOM_RAND_GENERATE_BLOCK */
 
     #define USE_TEST_GENSEED
+#elif defined(DEVKITPRO)
+        int wc_GenerateSeed(OS_Seed* os, byte* output, word32 sz)
+        {
+            (void)os;
+
+            srand(time(NULL));
+
+            size_t i;
+            for (i = 0; i < sz; i++)
+            {
+                output[i] = rand() % 256;
+                if ((i % 8) == 7)
+                {
+                    srand(time(NULL));
+                }
+            }
+
+            return 0;
+        }
 
 #elif defined(NO_DEV_RANDOM)
 
