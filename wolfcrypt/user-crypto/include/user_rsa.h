@@ -1,6 +1,6 @@
 /* user_rsa.h
  *
- * Copyright (C) 2006-2016 wolfSSL Inc.
+ * Copyright (C) 2006-2017 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -50,11 +50,11 @@
     #define WOLFSSL_RSA_TYPE_DEFINED
 #endif
 
+
 enum {
     RSA_PUBLIC   = 0,
     RSA_PRIVATE  = 1,
 };
-
 
 /* RSA */
 struct RsaKey {

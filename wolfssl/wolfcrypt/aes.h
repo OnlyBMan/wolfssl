@@ -1,6 +1,6 @@
 /* aes.h
  *
- * Copyright (C) 2006-2016 wolfSSL Inc.
+ * Copyright (C) 2006-2017 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -99,10 +99,6 @@ typedef struct Aes {
 #endif /* WOLFSSL_ASYNC_CRYPT */
 #ifdef WOLFSSL_AES_COUNTER
     word32  left;            /* unused bytes left from last call */
-#endif
-#ifdef WOLFSSL_PIC32MZ_CRYPT
-    word32 key_ce[AES_BLOCK_SIZE*2/sizeof(word32)];
-    word32 iv_ce [AES_BLOCK_SIZE  /sizeof(word32)];
 #endif
 #ifdef WOLFSSL_XILINX_CRYPT
     XSecure_Aes xilAes;

@@ -1,6 +1,6 @@
-/* io.c
+/* wolfio.c
  *
- * Copyright (C) 2006-2016 wolfSSL Inc.
+ * Copyright (C) 2006-2017 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -36,7 +36,7 @@
 
 #include <wolfssl/internal.h>
 #include <wolfssl/error-ssl.h>
-#include <wolfssl/io.h>
+#include <wolfssl/wolfio.h>
 
 #if defined(HAVE_HTTP_CLIENT)
     #include <stdlib.h>   /* atoi(), strtol() */
@@ -417,7 +417,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
     int sd = ssl->wfd;
     SOCKADDR_S peer;
     XSOCKLENT peerSz = sizeof(peer);
-    byte digest[SHA256_DIGEST_SIZE];
+    byte digest[WC_SHA256_DIGEST_SIZE];
     int  ret = 0;
 
     (void)ctx;
@@ -432,8 +432,8 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
     if (ret != 0)
         return ret;
 
-    if (sz > SHA256_DIGEST_SIZE)
-        sz = SHA256_DIGEST_SIZE;
+    if (sz > WC_SHA256_DIGEST_SIZE)
+        sz = WC_SHA256_DIGEST_SIZE;
     XMEMCPY(buf, digest, sz);
 
     return sz;
@@ -460,7 +460,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
         /* get peer information stored in ssl struct */
         peerSz = sizeof(SOCKADDR_S);
         if ((ret = wolfSSL_dtls_get_peer(ssl, (void*)&peer, &peerSz))
-                                                               != SSL_SUCCESS) {
+                                                               != WOLFSSL_SUCCESS) {
             return ret;
         }
 
@@ -494,7 +494,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
         ip[*ipSz - 1] = '\0'; /* make sure has terminator */
         *ipSz = (word16)XSTRLEN(ip);
 
-        return SSL_SUCCESS;
+        return WOLFSSL_SUCCESS;
     }
 
     /* set the peer information in human readable form (ip, port, family)
@@ -524,7 +524,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
 
                 /* peer sa is free'd in SSL_ResourceFree */
                 if ((ret = wolfSSL_dtls_set_peer(ssl, (SOCKADDR_IN*)&addr,
-                                          sizeof(SOCKADDR_IN)))!= SSL_SUCCESS) {
+                                          sizeof(SOCKADDR_IN)))!= WOLFSSL_SUCCESS) {
                     WOLFSSL_MSG("Import DTLS peer info error");
                     return ret;
                 }
@@ -541,7 +541,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
 
                 /* peer sa is free'd in SSL_ResourceFree */
                 if ((ret = wolfSSL_dtls_set_peer(ssl, (SOCKADDR_IN6*)&addr,
-                                         sizeof(SOCKADDR_IN6)))!= SSL_SUCCESS) {
+                                         sizeof(SOCKADDR_IN6)))!= WOLFSSL_SUCCESS) {
                     WOLFSSL_MSG("Import DTLS peer info error");
                     return ret;
                 }
@@ -553,7 +553,7 @@ int EmbedGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
                 return BUFFER_E;
         }
 
-        return SSL_SUCCESS;
+        return WOLFSSL_SUCCESS;
     }
 #endif /* WOLFSSL_SESSION_EXPORT */
 #endif /* WOLFSSL_DTLS */
@@ -933,7 +933,7 @@ static int wolfIO_HttpProcessResponseBuf(int sfd, byte **recvBuf, int* recvBufSz
     return 0;
 }
 
-int wolfIO_HttpProcessResponse(int sfd, const char* appStr,
+int wolfIO_HttpProcessResponse(int sfd, const char** appStrList,
     byte** respBuf, byte* httpBuf, int httpBufSz, int dynType, void* heap)
 {
     int result = 0;
@@ -1016,9 +1016,21 @@ int wolfIO_HttpProcessResponse(int sfd, const char* appStr,
                 case phr_have_length:
                 case phr_have_type:
                     if (XSTRNCASECMP(start, "Content-Type:", 13) == 0) {
+                        int i;
+
                         start += 13;
                         while (*start == ' ' && *start != '\0') start++;
-                        if (XSTRNCASECMP(start, appStr, XSTRLEN(appStr)) != 0) {
+
+                        /* try and match against appStrList */
+                        i = 0;
+                        while (appStrList[i] != NULL) {
+                            if (XSTRNCASECMP(start, appStrList[i],
+                                                XSTRLEN(appStrList[i])) == 0) {
+                                break;
+                            }
+                            i++;
+                        }
+                        if (appStrList[i] == NULL) {
                             WOLFSSL_MSG("wolfIO_HttpProcessResponse appstr mismatch");
                             return -1;
                         }
@@ -1168,7 +1180,12 @@ int wolfIO_HttpBuildRequestOcsp(const char* domainName, const char* path,
 int wolfIO_HttpProcessResponseOcsp(int sfd, byte** respBuf,
                                        byte* httpBuf, int httpBufSz, void* heap)
 {
-    return wolfIO_HttpProcessResponse(sfd, "application/ocsp-response",
+    const char* appStrList[] = {
+        "application/ocsp-response",
+        NULL
+    };
+
+    return wolfIO_HttpProcessResponse(sfd, appStrList,
         respBuf, httpBuf, httpBufSz, DYNAMIC_TYPE_OCSP, heap);
 }
 
@@ -1277,10 +1294,16 @@ int wolfIO_HttpProcessResponseCrl(WOLFSSL_CRL* crl, int sfd, byte* httpBuf,
     int result;
     byte *respBuf = NULL;
 
-    result = wolfIO_HttpProcessResponse(sfd, "application/pkix-crl",
+    const char* appStrList[] = {
+        "application/pkix-crl",
+        "application/x-pkcs7-crl",
+        NULL
+    };
+
+    result = wolfIO_HttpProcessResponse(sfd, appStrList,
         &respBuf, httpBuf, httpBufSz, DYNAMIC_TYPE_CRL, crl->heap);
     if (result >= 0) {
-        result = BufferLoadCRL(crl, respBuf, result, SSL_FILETYPE_ASN1, 0);
+        result = BufferLoadCRL(crl, respBuf, result, WOLFSSL_FILETYPE_ASN1, 0);
     }
     XFREE(respBuf, crl->heap, DYNAMIC_TYPE_CRL);
 
@@ -1747,14 +1770,14 @@ int MicriumGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
 {
     NET_SOCK_ADDR peer;
     NET_SOCK_ADDR_LEN peerSz = sizeof(peer);
-    byte digest[SHA_DIGEST_SIZE];
+    byte digest[WC_SHA_DIGEST_SIZE];
     int  ret = 0;
 
     (void)ctx;
 
     XMEMSET(&peer, 0, sizeof(peer));
     if (wolfSSL_dtls_get_peer(ssl, (void*)&peer,
-                              (unsigned int*)&peerSz) != SSL_SUCCESS) {
+                              (unsigned int*)&peerSz) != WOLFSSL_SUCCESS) {
         WOLFSSL_MSG("getpeername failed in MicriumGenerateCookie");
         return GEN_COOKIE_E;
     }
@@ -1763,8 +1786,8 @@ int MicriumGenerateCookie(WOLFSSL* ssl, byte *buf, int sz, void *ctx)
     if (ret != 0)
         return ret;
 
-    if (sz > SHA_DIGEST_SIZE)
-        sz = SHA_DIGEST_SIZE;
+    if (sz > WC_SHA_DIGEST_SIZE)
+        sz = WC_SHA_DIGEST_SIZE;
     XMEMCPY(buf, digest, sz);
 
     return sz;

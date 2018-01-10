@@ -1,6 +1,6 @@
 /* asn_public.h
  *
- * Copyright (C) 2006-2016 wolfSSL Inc.
+ * Copyright (C) 2006-2017 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -79,7 +79,7 @@ enum Ctc_SigType {
     CTC_SHAwRSA      = 649,
     CTC_SHAwECDSA    = 520,
     CTC_SHA224wRSA   = 658,
-    CTC_SHA224wECDSA = 527,
+    CTC_SHA224wECDSA = 523,
     CTC_SHA256wRSA   = 655,
     CTC_SHA256wECDSA = 524,
     CTC_SHA384wRSA   = 656,
@@ -99,7 +99,7 @@ enum Ctc_Misc {
     CTC_NAME_SIZE     =    64,
     CTC_DATE_SIZE     =    32,
     CTC_MAX_ALT_SIZE  = 16384,   /* may be huge */
-    CTC_SERIAL_SIZE   =     8,
+    CTC_SERIAL_SIZE   =    16,
 #ifdef WOLFSSL_CERT_EXT
     /* AKID could contains: hash + (Option) AuthCertIssuer,AuthCertSerialNum
      * We support only hash */
@@ -136,6 +136,7 @@ typedef struct CertName {
 typedef struct Cert {
     int      version;                   /* x509 version  */
     byte     serial[CTC_SERIAL_SIZE];   /* serial number */
+    int      serialSz;                  /* serial size */
     int      sigType;                   /* signature algo type */
     CertName issuer;                    /* issuer info */
     int      daysValid;                 /* validity days */
@@ -159,6 +160,7 @@ typedef struct Cert {
     byte    akid[CTC_MAX_AKID_SIZE];     /* Authority Key Identifier */
     int     akidSz;                      /* AKID size in bytes */
     word16  keyUsage;                    /* Key Usage */
+    byte    extKeyUsage;                 /* Extended Key Usage */
     char    certPolicies[CTC_MAX_CERTPOL_NB][CTC_MAX_CERTPOL_SZ];
     word16  certPoliciesNb;              /* Number of Cert Policy */
 #endif
@@ -235,6 +237,12 @@ WOLFSSL_API int wc_SetSubjectKeyIdFromNtruPublicKey(Cert *cert, byte *ntruKey,
  */
 WOLFSSL_API int wc_SetKeyUsage(Cert *cert, const char *value);
 
+/* Set ExtendedKeyUsage
+ * Value is a string separated tokens with ','. Accepted tokens are :
+ * any,serverAuth,clientAuth,codeSigning,emailProtection,timeStamping,OCSPSigning
+ */
+WOLFSSL_API int wc_SetExtKeyUsage(Cert *cert, const char *value);
+
 #endif /* WOLFSSL_CERT_EXT */
 
     #ifdef HAVE_NTRU
@@ -275,14 +283,14 @@ WOLFSSL_API int wc_SetKeyUsage(Cert *cert, const char *value);
     WOLFSSL_API int wc_EccKeyToDer(ecc_key*, byte* output, word32 inLen);
     WOLFSSL_API int wc_EccPrivateKeyToDer(ecc_key* key, byte* output,
                                           word32 inLen);
+    WOLFSSL_API int wc_EccPrivateKeyToPKCS8(ecc_key* key, byte* output,
+                                            word32* outLen);
 
     /* public key helper */
     WOLFSSL_API int wc_EccPublicKeyDecode(const byte*, word32*,
                                               ecc_key*, word32);
-    #if (defined(WOLFSSL_CERT_GEN) || defined(WOLFSSL_KEY_GEN))
-        WOLFSSL_API int wc_EccPublicKeyToDer(ecc_key*, byte* output,
-                                               word32 inLen, int with_AlgCurve);
-    #endif
+    WOLFSSL_API int wc_EccPublicKeyToDer(ecc_key*, byte* output,
+                                         word32 inLen, int with_AlgCurve);
 #endif
 
 #ifdef HAVE_ED25519
